@@ -1,46 +1,38 @@
 const Employees = require('../models/employee');
-const { generateToken, hashPwd } = require('../auth');
-const { comparePassword } = require('../auth');
+const { generateToken, hashPassword, comparePasswords } = require('../auth');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
 class EmployeeController {
     static async empLogin(ctx) {
         const { employee_username, employee_password } = ctx.request.body;
-        console.log('Recieved credentials', employee_username, employee_password);
+        console.log("Received credentials", employee_username, employee_password);
+
         try {
             const employee = await Employees.findOne({ where: { employee_username } });
-            console.log('found emp----->', employee);
+            console.log("Found emp----->", employee.dataValues);
+
             if (employee) {
-                console.log('Stored hashed password:', employee.dataValues.employee_password);
-                const isPasswordMatch = await comparePassword(employee_password, employee.dataValues.employee_password);
-                console.log('Is password match?', isPasswordMatch);
-                console.log('Entered password:', employee_password.trim());
-                console.log('Stored hashed password:', employee.dataValues.employee_password.trim());
-                console.log('Comparison result:', await comparePassword(
-                    employee_password.trim(),
-                    employee.dataValues.employee_password.trim()
-                  ));
+                const isPasswordMatch = await comparePasswords(employee_password, employee.dataValues.employee_password);
 
                 if (isPasswordMatch) {
                     const token = generateToken(employee);
-                    // console.log('found token----->', token);
-                    await Employees.update({ token }, { where: { employee_username } });
+
+                    await employee.update({ token });
 
                     ctx.body = { token, user: { employee_id: employee.employee_id, employee_name: employee.employee_name } };
-                    // ctx.body = { token };
                 } else {
                     ctx.status = 401;
-                    ctx.body = { error: 'Invalid username and password' };
+                    ctx.body = { error: "Invalid username and password" };
                 }
             } else {
                 ctx.status = 401;
-                ctx.body = { error: 'Invalid username and password' };
+                ctx.body = { error: "Invalid username and password" };
             }
         } catch (error) {
-            console.error('Error during login:', error);
+            console.error("Error during login:", error);
             ctx.status = 500;
-            ctx.body = { error: 'Internal server error' };
+            ctx.body = { error: "Internal server error" };
         }
     }
 
@@ -82,39 +74,33 @@ class EmployeeController {
     static async registerEmployee(ctx) {
         const { employee_name, employee_username, employee_password, employee_area } = ctx.request.body;
         try {
-            const existingEmployee = await Employees.findOne({
-                where: { employee_username },
+          const existingEmployee = await Employees.findOne({
+            where: { employee_username },
+          });
+          if (existingEmployee) {
+            ctx.status = 400;
+            ctx.body = { error: "Username is already taken" };
+          } else {
+            const hashedPassword = await hashPassword(employee_password);
+            const newEmployee = await Employees.create({
+              employee_name,
+              employee_username,
+              employee_password: hashedPassword,
+              employee_area,
+              no_of_surveys: 0,
+              token: generateToken({ employee_id: 0 }),
             });
-
-            if (existingEmployee) {
-                ctx.status = 400;
-                ctx.body = { error: "Username is already taken" };
-            } else {
-                const hashedPassword = hashPwd(employee_password.trim());
-
-                const newEmployee = await Employees.create({
-                    employee_name,
-                    employee_username,
-                    employee_password: hashedPassword,
-                    employee_area,
-                    no_of_surveys: 0,
-                    token: generateToken({ employee_id: 0 }),
-                });
-                const token = generateToken({ employee_id: newEmployee.employee_id });
-                // await Employees.query().patch({ token }).where('employee_id', newEmployee.employee_id);
-                await newEmployee.update({ token });
-                ctx.status = 201;
-                ctx.body = { message: 'Employee registered successfully', employee: newEmployee };
-            }
+            const token = generateToken({ employee_id: newEmployee.employee_id });
+            await newEmployee.update({ token });
+            ctx.status = 201;
+            ctx.body = { message: "Employee registered successfully", employee: newEmployee };
+          }
         } catch (error) {
-            console.error('Error during employee registration:', error);
-            ctx.status = 500;
-            ctx.body = { error: 'Internal server error' };
+          console.error("Error during employee registration:", error);
+          ctx.status = 500;
+          ctx.body = { error: "Internal server error" };
         }
-    }
-    static async empRegister(ctx) {
-        await EmployeeController.registerEmployee(ctx);
-    }
+      }   
 }
 
 module.exports = EmployeeController;

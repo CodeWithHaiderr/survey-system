@@ -1,22 +1,36 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const jwtSecretKey = 'yourSecretKey';
+const jwt = require("jsonwebtoken");
+const jwtSecretKey = "yourSecretKey";
+const bcrypt = require("bcrypt");
 
 const generateToken = (employee) => {
-    const token = jwt.sign({ emp_id: employee.emp_id }, jwtSecretKey, {
-        expiresIn: '2h',
-    });
-    return token;
+  const token = jwt.sign({ emp_id: employee.emp_id }, jwtSecretKey, {
+    expiresIn: "2h",
+  });
+  return token;
 };
-const comparePassword = async (password, hashedPassword) => {
-     return await bcrypt.compare(password, hashedPassword); 
+
+const hashPassword = async (plainPassword) => {
+  try {
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+    console.log("Hashed Password:", hashedPassword);
+    return hashedPassword;
+  } catch (error) {
+    console.error("Error during hashing:", error);
+  }
 };
-const hashPwd = (pwd) => {
-   const hashedPassword = bcrypt.hashSync(pwd,10);
-   return hashedPassword;
+
+const comparePasswords = async (plainPassword, hashedPassword) => {
+  try {
+    const isMatch = await bcrypt.compare(plainPassword, hashedPassword);
+    console.log("Password Match:", isMatch);
+    return isMatch;
+  } catch (error) {
+    console.error("Error during comparison:", error);
+  }
 };
-module.exports =  { 
-    generateToken,
-    comparePassword,
-    hashPwd,
+
+module.exports = {
+  generateToken,
+  comparePasswords,
+  hashPassword,
 };
